@@ -1,6 +1,6 @@
 # Monorepo vazio (NestJS + Prisma + Vite/React)
 
-Mesma stack do projeto de referência: API NestJS com Prisma e PostgreSQL (Docker), frontend Vite com React 19 e React Router. Sem domínio de negócio — apenas esqueleto para começar um produto novo.
+Mesma stack do projeto de referência: API NestJS com Prisma e PostgreSQL (Docker), frontend Vite com React 19 e React Router. O código inicia sem domínio de negócio; as **especificações do produto SaaS para escolinhas de futebol** estão em **[Docs/README.md](Docs/README.md)** (regras, rotinas e critérios de aceite).
 
 ## Pré-requisitos
 
