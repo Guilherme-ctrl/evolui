@@ -1,5 +1,7 @@
 # 10 — Módulo: Comunicação interna
 
+> **Refator ATLETA (2026-05):** ver nota no [README de Docs](README.md). O **destinatário in-app** dos comunicados é a `User role=ATLETA` (conta-atleta) — não mais `RESPONSAVEL`. Os métodos internos foram renomeados: `recipientUserIdsForTurmas` e `recipientUserIdsForStudent` (em `NotificationsService`) resolvem a partir de `Student.accountUserId`. Para **canais externos** (e-mail/WhatsApp/SMS), o destino continua sendo o `Guardian` com `isPrimaryForBilling=true` (cobrança/contato — sem login).
+
 ## 1. Objetivo
 
 Comunicação entre escolinha e responsáveis: avisos, alterações, convocações, eventos, mensagens individuais e alertas de pagamento.

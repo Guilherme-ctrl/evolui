@@ -7,4 +7,929 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Adicione modelos aqui e rode: npx prisma migrate dev
+enum UserRole {
+  ADMIN
+  TREINADOR
+  ATLETA
+}
+
+enum EventType {
+  TREINO
+  JOGO
+  AMISTOSO
+  EVENTO
+  CAMPEONATO
+  AVALIACAO
+  REUNIAO
+}
+
+enum EventStatus {
+  SCHEDULED
+  CANCELLED
+}
+
+enum ChargeStatus {
+  PENDENTE
+  PAGO
+  ATRASADO
+}
+
+enum ReportStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum CommunicationScope {
+  GLOBAL
+  TURMA
+  DIRECT
+}
+
+enum EvaluationModel {
+  STARS
+  SIMPLE_SCALE
+}
+
+enum AttendanceMode {
+  MARK_PRESENT
+  MARK_ABSENT
+}
+
+enum StudentDocumentType {
+  CPF
+  RG
+  RNE
+  OUTRO
+}
+
+enum ProfessionalType {
+  PROFESSOR
+  FISIOTERAPEUTA
+  PREPARADOR_FISICO
+  OUTRO
+}
+
+enum IndividualPlanType {
+  TREINO
+  REFORCO_TECNICO
+  TRATAMENTO
+  RECUPERACAO
+  OUTRO
+}
+
+enum IndividualPlanStatus {
+  DRAFT
+  PUBLISHED
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+model Tenant {
+  id                        String                   @id @default(cuid())
+  name                      String
+  slug                      String                   @unique
+  evaluationModel           EvaluationModel          @default(STARS)
+  /// Dimensões habilitadas: [{ "key": "participacao", "label": "Participação", "order": 0 }]
+  evaluationDimensions      Json                     @default("[]")
+  /// Dimensões padrão usadas em feedback físico pós-evento do calendário
+  /// (RN-1325). Cada evento pode sobrescrever via `CalendarEvent.feedbackDimensions`
+  /// (null = herda este). Mesma estrutura `[{ key, label, order }]`, até 5 itens.
+  defaultFeedbackDimensions Json                     @default("[]")
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+  users                     User[]
+  guardians                 Guardian[]
+  studentGuardians          StudentGuardian[]
+  students                  Student[]
+  turmas                    Turma[]
+  calendarEvents            CalendarEvent[]
+  attendanceSessions        AttendanceSession[]
+  evaluations               Evaluation[]
+  reports                   Report[]
+  communications            CommunicationMessage[]
+  mediaAssets               MediaAsset[]
+  notifications             Notification[]
+  notificationPrefs         NotificationPreference[]
+  financialCharges          FinancialCharge[]
+  financialChargeAudits     FinancialChargeAudit[]
+  studentDeletionAudits     StudentDeletionAudit[]
+  healthAudits              StudentHealthAudit[]
+  scheduleAudits            TurmaScheduleAudit[]
+  calendarEventAudits       CalendarEventAudit[]
+  attendanceReopenAudits    AttendanceReopenAudit[]
+  enrollments               Enrollment[]
+  staffProfiles             StaffProfile[]
+  individualPlans           IndividualPlan[]
+  individualPlanAudits      IndividualPlanAudit[]
+  exerciseLibraryItems      ExerciseLibraryItem[]
+  workouts                  Workout[]
+  workoutAssignments        WorkoutAssignment[]
+  workoutFeedbacks          WorkoutFeedback[]
+  calendarEventFeedbacks    CalendarEventFeedback[]
+}
+
+model User {
+  id              String    @id @default(cuid())
+  tenantId        String
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email           String
+  passwordHash    String
+  role            UserRole
+  fullName        String
+  active          Boolean   @default(true)
+  /// Incrementado em logout-all para revogar JWTs antigos (RNF §2).
+  tokenVersion    Int       @default(0)
+  /// Aceite no 1º login da conta-atleta (RN-201). NULL enquanto não aceito.
+  termsAcceptedAt DateTime?
+  /// Quem está usando a conta — "ATLETA" quando o próprio aluno opera,
+  /// ou o grau de parentesco ("Pai", "Mãe", "Tutor"…) quando responsável legal.
+  termsKinship    String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  coachTurmas                    Turma[]                  @relation("TurmaCoach")
+  calendarEventsCreated          CalendarEvent[]          @relation("EventCreatedBy")
+  calendarEventsCanceled         CalendarEvent[]          @relation("EventCanceledBy")
+  attendanceFinalized            AttendanceSession[]      @relation("AttendanceFinalizedBy")
+  evaluationsAsCoach             Evaluation[]             @relation("EvaluationCoach")
+  reportsAuthored                Report[]                 @relation("ReportAuthor")
+  communicationsAuthored         CommunicationMessage[]   @relation("CommunicationAuthor")
+  mediaUploaded                  MediaAsset[]             @relation("MediaUploader")
+  notifications                  Notification[]
+  notificationPrefs              NotificationPreference[]
+  communicationRecipients        CommunicationRecipient[]
+  directMessagesReceived         CommunicationMessage[]   @relation("DirectRecipient")
+  healthAudits                   StudentHealthAudit[]     @relation("HealthAuditActor")
+  scheduleAudits                 TurmaScheduleAudit[]     @relation("ScheduleAuditActor")
+  calendarEventAuditsCreated     CalendarEventAudit[]     @relation("CalendarEventAuditActor")
+  attendanceReopens              AttendanceReopenAudit[]  @relation("AttendanceReopenActor")
+  financialChargeAuditsActor     FinancialChargeAudit[]   @relation("FinancialChargeAuditActor")
+  studentDeletionAudits          StudentDeletionAudit[]   @relation("StudentDeletionAuditActor")
+  staffProfile                   StaffProfile?
+  individualPlansCreated         IndividualPlan[]         @relation("IndividualPlanCreatedBy")
+  individualPlanAudits           IndividualPlanAudit[]    @relation("IndividualPlanAuditActor")
+  /// Alunos cuja conta de login (ATLETA) é este usuário. 1 User pode servir N
+  /// alunos da mesma família (switcher de aluno no header — RN-200).
+  accountStudents                Student[]                @relation("StudentAccountUser")
+  /// Exercícios autorados por este usuário na biblioteca compartilhada do tenant.
+  /// ADMIN pode autorar sem `StaffProfile` (RN-1311). Edita/arquiva: autor ou ADMIN.
+  authoredExerciseLibrary        ExerciseLibraryItem[]    @relation("ExerciseLibraryAuthor")
+  /// Treinos (Workout) criados por este usuário (ADMIN ou TREINADOR/Staff).
+  /// Mesma regra "autor ou ADMIN" para edição/arquivamento (RN-1311 estendido).
+  authoredWorkouts               Workout[]                @relation("WorkoutAuthor")
+  /// Atribuições de treinos feitas por este usuário (auditoria simples).
+  workoutAssignmentsCreated      WorkoutAssignment[]      @relation("WorkoutAssigner")
+  /// Feedbacks de treino submetidos por esta conta-atleta (RN-1323).
+  workoutFeedbacksAuthored       WorkoutFeedback[]        @relation("WorkoutFeedbackAuthor")
+  /// Feedbacks de eventos do calendário submetidos por esta conta-atleta (RN-1325).
+  calendarEventFeedbacksAuthored CalendarEventFeedback[]  @relation("CalendarEventFeedbackAuthor")
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([tenantId, role])
+}
+
+/// Contato adulto vinculado a um aluno (pai, mãe, tutor…). Não faz login no
+/// app — é apenas o cadastro usado para cobrança e canais externos
+/// (e-mail/SMS/WhatsApp). Quem opera o app é a conta-atleta (Student.accountUser).
+model Guardian {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fullName  String
+  phone     String?
+  whatsapp  String?
+  email     String?
+  kinship   String?
+  address   String?
+  cpf       String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  students StudentGuardian[]
+
+  @@index([tenantId])
+}
+
+model Student {
+  id                   String               @id @default(cuid())
+  tenantId             String
+  tenant               Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fullName             String
+  photoUrl             String?
+  birthDate            DateTime?            @db.Date
+  categoryLabel        String?
+  preferredPosition    String?
+  emergencyContact     String?
+  medicalNotes         String?
+  physicalRestrictions String?
+  documentType         StudentDocumentType?
+  documentNumber       String?
+  active               Boolean              @default(true)
+  /// Conta de login (role=ATLETA) deste aluno. Pode ser compartilhada por
+  /// irmãos: 1 conta serve N alunos da mesma família (RN-200).
+  accountUserId        String
+  accountUser          User                 @relation("StudentAccountUser", fields: [accountUserId], references: [id], onDelete: Restrict)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  guardians              StudentGuardian[]
+  enrollments            Enrollment[]
+  attendance             AttendanceRecord[]
+  evaluations            Evaluation[]
+  reports                Report[]
+  mediaTags              MediaTagStudent[]
+  financialCharges       FinancialCharge[]
+  healthAudits           StudentHealthAudit[]
+  individualPlans        IndividualPlan[]
+  workoutAssignments     WorkoutAssignment[]
+  workoutFeedbacks       WorkoutFeedback[]
+  calendarEventFeedbacks CalendarEventFeedback[]
+
+  @@index([tenantId])
+  @@index([tenantId, active])
+  @@index([tenantId, documentNumber])
+  @@index([tenantId, accountUserId])
+}
+
+model StaffProfile {
+  id               String           @id @default(cuid())
+  tenantId         String
+  tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId           String           @unique
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  professionalType ProfessionalType
+  registry         String?
+  bio              String?          @db.VarChar(280)
+  active           Boolean          @default(true)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  individualPlans           IndividualPlan[]      @relation("IndividualPlanProfessional")
+  ownedExerciseLibraryItems ExerciseLibraryItem[] @relation("ExerciseLibraryOwner")
+  ownedWorkouts             Workout[]             @relation("WorkoutOwner")
+
+  @@index([tenantId])
+  @@index([tenantId, professionalType])
+}
+
+model IndividualPlan {
+  id                     String               @id @default(cuid())
+  tenantId               String
+  tenant                 Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  studentId              String
+  student                Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  assignedProfessionalId String
+  assignedProfessional   StaffProfile         @relation("IndividualPlanProfessional", fields: [assignedProfessionalId], references: [id], onDelete: Restrict)
+  type                   IndividualPlanType
+  title                  String               @db.VarChar(140)
+  goal                   String?              @db.VarChar(500)
+  startDate              DateTime             @db.Date
+  endDate                DateTime?            @db.Date
+  weeklyFrequency        Int?
+  status                 IndividualPlanStatus @default(DRAFT)
+  publishedAt            DateTime?
+  pausedAt               DateTime?
+  completedAt            DateTime?
+  cancelledAt            DateTime?
+  cancelReason           String?
+  completionNote         String?              @db.VarChar(280)
+  createdById            String
+  createdBy              User                 @relation("IndividualPlanCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+
+  sessions IndividualPlanSession[]
+  audits   IndividualPlanAudit[]
+
+  @@index([tenantId, studentId])
+  @@index([tenantId, assignedProfessionalId])
+  @@index([tenantId, status])
+}
+
+model IndividualPlanSession {
+  id                       String         @id @default(cuid())
+  planId                   String
+  plan                     IndividualPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  order                    Int
+  title                    String         @db.VarChar(140)
+  instructions             String?        @db.VarChar(1000)
+  estimatedDurationMinutes Int?
+
+  exercises IndividualPlanExercise[]
+
+  @@unique([planId, order])
+}
+
+model IndividualPlanExercise {
+  id              String                @id @default(cuid())
+  sessionId       String
+  session         IndividualPlanSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  order           Int
+  name            String                @db.VarChar(140)
+  description     String?               @db.VarChar(500)
+  videoUrl        String?
+  sets            Int?
+  repetitions     Int?
+  durationSeconds Int?
+  restSeconds     Int?
+  notes           String?               @db.VarChar(280)
+
+  @@unique([sessionId, order])
+}
+
+model IndividualPlanAudit {
+  id           String         @id @default(cuid())
+  tenantId     String
+  tenant       Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  planId       String
+  plan         IndividualPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  action       String
+  previousJson Json?
+  nextJson     Json?
+  reason       String?
+  createdById  String
+  createdBy    User           @relation("IndividualPlanAuditActor", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt    DateTime       @default(now())
+
+  @@index([tenantId, planId])
+}
+
+model StudentGuardian {
+  id                  String   @id @default(cuid())
+  tenantId            String
+  tenant              Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  studentId           String
+  guardianId          String
+  isPrimaryForBilling Boolean  @default(false)
+  student             Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  guardian            Guardian @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, guardianId])
+  @@index([tenantId])
+  @@index([guardianId])
+}
+
+model Turma {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name          String
+  ageRangeText  String?
+  weekDaysText  String?
+  scheduleText  String?
+  location      String?
+  capacity      Int
+  coachUserId   String
+  coach         User     @relation("TurmaCoach", fields: [coachUserId], references: [id], onDelete: Restrict)
+  categoryLabel String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  enrollments        Enrollment[]
+  calendarLinks      CalendarEventTurma[]
+  attendanceSessions AttendanceSession[]
+  evaluations        Evaluation[]
+  communications     CommunicationMessage[]
+  mediaAssets        MediaAsset[]
+  scheduleAudits     TurmaScheduleAudit[]
+  workoutAssignments WorkoutAssignment[]
+
+  @@index([tenantId])
+  @@index([tenantId, coachUserId])
+}
+
+model TurmaScheduleAudit {
+  id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  turmaId      String
+  turma        Turma    @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+  previousJson Json
+  nextJson     Json
+  createdById  String
+  createdBy    User     @relation("ScheduleAuditActor", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt    DateTime @default(now())
+
+  @@index([tenantId, turmaId])
+}
+
+model Enrollment {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  studentId  String
+  turmaId    String
+  enrolledAt DateTime @default(now())
+  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  turma      Turma    @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, turmaId])
+  @@index([tenantId, turmaId])
+}
+
+model CalendarEvent {
+  id                 String      @id @default(cuid())
+  tenantId           String
+  tenant             Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  type               EventType
+  title              String
+  startsAt           DateTime
+  endsAt             DateTime
+  location           String?
+  status             EventStatus @default(SCHEDULED)
+  cancelReason       String?
+  canceledAt         DateTime?
+  canceledById       String?
+  canceledBy         User?       @relation("EventCanceledBy", fields: [canceledById], references: [id], onDelete: SetNull)
+  isWholeSchool      Boolean     @default(false)
+  createdById        String?
+  createdBy          User?       @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  /// Override do tenant para dimensões de feedback físico deste evento
+  /// específico (RN-1325). `null` => herda `Tenant.defaultFeedbackDimensions`;
+  /// `[]` => feedback explicitamente desligado neste evento; lista preenchida
+  /// => substitui o default. Mesma estrutura `[{ key, label, order }]`.
+  feedbackDimensions Json?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  turmas             CalendarEventTurma[]
+  attendanceSessions AttendanceSession[]
+  mediaAssets        MediaAsset[]
+  communications     CommunicationMessage[]
+  audits             CalendarEventAudit[]
+  feedbacks          CalendarEventFeedback[]
+
+  @@index([tenantId, startsAt])
+  @@index([tenantId, status])
+}
+
+/// Feedback físico submetido pelo aluno para um evento do calendário
+/// (RN-1325/1326). Cadência: **uma submissão por (evento, aluno)** — o ATLETA
+/// pode reabrir e editar; relatório do professor exibe a versão atual.
+/// `scores` segue o mesmo formato `{ <dimKey>: 1..5 }` do `WorkoutFeedback`.
+model CalendarEventFeedback {
+  id                String        @id @default(cuid())
+  tenantId          String
+  tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  eventId           String
+  event             CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  studentId         String
+  student           Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  submittedByUserId String
+  submittedByUser   User          @relation("CalendarEventFeedbackAuthor", fields: [submittedByUserId], references: [id], onDelete: Restrict)
+  scores            Json
+  notes             String?       @db.VarChar(280)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@unique([eventId, studentId])
+  @@index([tenantId, studentId, createdAt])
+  @@index([eventId])
+}
+
+model CalendarEventAudit {
+  id           String        @id @default(cuid())
+  tenantId     String
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  eventId      String
+  event        CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  previousJson Json
+  nextJson     Json
+  createdById  String
+  createdBy    User          @relation("CalendarEventAuditActor", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt    DateTime      @default(now())
+
+  @@index([tenantId, eventId])
+}
+
+model CalendarEventTurma {
+  eventId String
+  turmaId String
+  event   CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  turma   Turma         @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, turmaId])
+  @@index([turmaId])
+}
+
+model AttendanceSession {
+  id            String                  @id @default(cuid())
+  tenantId      String
+  tenant        Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  turmaId       String
+  turma         Turma                   @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+  eventId       String
+  event         CalendarEvent           @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  mode          AttendanceMode
+  finalizedAt   DateTime?
+  finalizedById String?
+  finalizedBy   User?                   @relation("AttendanceFinalizedBy", fields: [finalizedById], references: [id], onDelete: SetNull)
+  reopenedAt    DateTime?
+  records       AttendanceRecord[]
+  reopenAudits  AttendanceReopenAudit[]
+
+  @@unique([turmaId, eventId])
+  @@index([tenantId, turmaId])
+}
+
+model AttendanceReopenAudit {
+  id           String            @id @default(cuid())
+  tenantId     String
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sessionId    String
+  session      AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  reopenedById String
+  reopenedBy   User              @relation("AttendanceReopenActor", fields: [reopenedById], references: [id], onDelete: Restrict)
+  reopenedAt   DateTime          @default(now())
+
+  @@index([tenantId, sessionId])
+}
+
+model AttendanceRecord {
+  id        String            @id @default(cuid())
+  sessionId String
+  studentId String
+  present   Boolean
+  session   AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  student   Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, studentId])
+  @@index([studentId])
+}
+
+/// Registro após exclusão definitiva do aluno (RN-105). studentId é apenas histórico (sem FK).
+model StudentDeletionAudit {
+  id               String   @id @default(cuid())
+  tenantId         String
+  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  studentId        String
+  fullNameSnapshot String
+  deletedById      String
+  deletedBy        User     @relation("StudentDeletionAuditActor", fields: [deletedById], references: [id], onDelete: Restrict)
+  reason           String
+  createdAt        DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([tenantId, studentId])
+}
+
+model StudentHealthAudit {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  studentId     String
+  student       Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  changedById   String
+  changedBy     User     @relation("HealthAuditActor", fields: [changedById], references: [id], onDelete: Restrict)
+  field         String
+  previousValue String?
+  newValue      String?
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId, studentId])
+}
+
+model Evaluation {
+  id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  studentId    String
+  student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  turmaId      String
+  turma        Turma    @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+  coachUserId  String
+  coach        User     @relation("EvaluationCoach", fields: [coachUserId], references: [id], onDelete: Restrict)
+  evaluatedAt  DateTime @default(now())
+  comment      String?  @db.VarChar(140)
+  autoFeedback String
+  /// { "participacao": 4 } estrelas ou rótulos da escala simples
+  scores       Json
+
+  @@index([tenantId, studentId])
+  @@index([tenantId, turmaId])
+}
+
+model Report {
+  id          String       @id @default(cuid())
+  tenantId    String
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  studentId   String
+  student     Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  periodStart DateTime     @db.Date
+  periodEnd   DateTime     @db.Date
+  title       String
+  summaryText String
+  dataJson    Json?
+  status      ReportStatus @default(DRAFT)
+  publishedAt DateTime?
+  createdById String?
+  createdBy   User?        @relation("ReportAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([tenantId, studentId])
+  @@index([tenantId, status])
+}
+
+model CommunicationMessage {
+  id              String             @id @default(cuid())
+  tenantId        String
+  tenant          Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  scope           CommunicationScope
+  turmaId         String?
+  turma           Turma?             @relation(fields: [turmaId], references: [id], onDelete: SetNull)
+  title           String
+  body            String
+  authorUserId    String
+  author          User               @relation("CommunicationAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+  calendarEventId String?
+  calendarEvent   CalendarEvent?     @relation(fields: [calendarEventId], references: [id], onDelete: SetNull)
+  recipientUserId String?
+  /// Para DIRECT: destinatário explícito (conta-atleta).
+  recipient       User?              @relation("DirectRecipient", fields: [recipientUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime           @default(now())
+
+  recipients CommunicationRecipient[]
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, turmaId])
+}
+
+model CommunicationRecipient {
+  id        String               @id @default(cuid())
+  messageId String
+  userId    String
+  readAt    DateTime?
+  message   CommunicationMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([userId])
+}
+
+model MediaAsset {
+  id           String         @id @default(cuid())
+  tenantId     String
+  tenant       Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  storageKey   String
+  mimeType     String
+  sizeBytes    Int
+  turmaId      String?
+  turma        Turma?         @relation(fields: [turmaId], references: [id], onDelete: SetNull)
+  eventId      String?
+  event        CalendarEvent? @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  thumbnailKey String?
+  uploadedById String
+  uploadedBy   User           @relation("MediaUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
+  createdAt    DateTime       @default(now())
+
+  studentTags MediaTagStudent[]
+
+  @@index([tenantId, turmaId])
+  @@index([tenantId, eventId])
+}
+
+model MediaTagStudent {
+  mediaId   String
+  studentId String
+  media     MediaAsset @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  student   Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@id([mediaId, studentId])
+}
+
+model Notification {
+  id          String    @id @default(cuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String
+  title       String
+  body        String
+  payloadJson Json?
+  dedupeKey   String?
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([userId, dedupeKey])
+  @@index([tenantId, userId])
+  @@index([userId, readAt])
+}
+
+model NotificationPreference {
+  id           String  @id @default(cuid())
+  tenantId     String
+  tenant       Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category     String
+  inAppEnabled Boolean @default(true)
+
+  @@unique([userId, category])
+  @@index([tenantId])
+}
+
+model FinancialCharge {
+  id            String                 @id @default(cuid())
+  tenantId      String
+  tenant        Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  studentId     String
+  student       Student                @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  amountCents   Int
+  dueDate       DateTime               @db.Date
+  status        ChargeStatus           @default(PENDENTE)
+  paidAt        DateTime?
+  paymentMethod String?
+  notes         String?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  audits        FinancialChargeAudit[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, studentId])
+}
+
+model FinancialChargeAudit {
+  id          String          @id @default(cuid())
+  tenantId    String
+  tenant      Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  chargeId    String
+  charge      FinancialCharge @relation(fields: [chargeId], references: [id], onDelete: Cascade)
+  fromStatus  ChargeStatus
+  toStatus    ChargeStatus
+  changedById String
+  changedBy   User            @relation("FinancialChargeAuditActor", fields: [changedById], references: [id], onDelete: Restrict)
+  reason      String?
+  createdAt   DateTime        @default(now())
+
+  @@index([tenantId, chargeId])
+}
+
+/// Biblioteca compartilhada de exercícios reutilizáveis (PI-5.2 / Doc 24 §9 promovido p/ Fase 2).
+/// Visibilidade: compartilhada por tenant — qualquer ADMIN ou StaffProfile.active vê e usa.
+/// Autoria/edição: `createdByUserId` (User) é o autor real e a fonte de verdade para regra
+/// "autor ou ADMIN edita/arquiva". `ownerStaffId` é opcional e só preenche quando o autor for
+/// um TREINADOR com `StaffProfile` (mantido para relatório/atribuição profissional). ADMIN pode
+/// criar exercícios sem ter `StaffProfile` (RN-1311).
+/// Adicionar à sessão produz um snapshot em IndividualPlanExercise (independente do template).
+model ExerciseLibraryItem {
+  id                     String        @id @default(cuid())
+  tenantId               String
+  tenant                 Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ownerStaffId           String?
+  ownerStaff             StaffProfile? @relation("ExerciseLibraryOwner", fields: [ownerStaffId], references: [id], onDelete: SetNull)
+  createdByUserId        String
+  createdByUser          User          @relation("ExerciseLibraryAuthor", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  name                   String        @db.VarChar(140)
+  description            String?       @db.VarChar(500)
+  videoUrl               String?       @db.VarChar(2000)
+  defaultSets            Int?
+  defaultRepetitions     Int?
+  defaultDurationSeconds Int?
+  defaultRestSeconds     Int?
+  notes                  String?       @db.VarChar(280)
+  archived               Boolean       @default(false)
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+
+  /// Itens de Workout que referenciam este exercício. Mantemos `onDelete: Restrict`
+  /// para preservar a integridade de treinos publicados (RN-1320).
+  workoutExercises WorkoutExercise[]
+
+  @@index([tenantId, archived])
+  @@index([tenantId, ownerStaffId])
+  @@index([tenantId, createdByUserId])
+  @@index([tenantId, name])
+}
+
+/// Enum de escopo da atribuição de um treino — exatamente um campo entre
+/// `turmaId` e `studentId` é preenchido conforme `scope`. O CHECK desta
+/// invariante está na migration (não suportado direto em Prisma).
+enum WorkoutAssignmentScope {
+  TURMA
+  STUDENT
+}
+
+/// Treino (workout) reutilizável criado por ADMIN/PROFESSOR (Doc 25 — RN-1320).
+/// Substitui o tipo `TREINO` do IndividualPlan; `IndividualPlan` fica apenas
+/// para TRATAMENTO clínico. Exercícios são sempre referenciados da biblioteca
+/// (`ExerciseLibraryItem`), com snapshot de nome/descrição/vídeo no momento
+/// da adição para não quebrar treinos atribuídos se a biblioteca mudar (RN-1310).
+model Workout {
+  id                 String        @id @default(cuid())
+  tenantId           String
+  tenant             Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name               String        @db.VarChar(140)
+  description        String?       @db.VarChar(500)
+  notes              String?       @db.VarChar(500)
+  archived           Boolean       @default(false)
+  /// Autor (User) — regra "autor ou ADMIN edita/arquiva" (RN-1311 estendido).
+  createdByUserId    String
+  createdByUser      User          @relation("WorkoutAuthor", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  /// Autor profissional (opcional, mantido para relatório quando autor for TREINADOR/Staff).
+  ownerStaffId       String?
+  ownerStaff         StaffProfile? @relation("WorkoutOwner", fields: [ownerStaffId], references: [id], onDelete: SetNull)
+  /// Dimensões de feedback físico pós-treino (RN-1323). Array ordenado de até 5
+  /// entradas no formato `{ key, label, order }`. Valores são inteiros 1-5
+  /// (`WorkoutFeedback.scores`). Configurado pelo autor do treino na UI.
+  feedbackDimensions Json          @default("[]")
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  exercises   WorkoutExercise[]
+  assignments WorkoutAssignment[]
+  feedbacks   WorkoutFeedback[]
+
+  @@index([tenantId, archived])
+  @@index([tenantId, createdByUserId])
+  @@index([tenantId, name])
+}
+
+/// Feedback físico pós-treino do aluno (RN-1323/1324 — Doc 25 §3).
+/// Cadência: **uma submissão por dia** por (workoutId, studentId) — reabrir no
+/// mesmo dia atualiza a entrada (upsert por `submittedDate`); no dia seguinte
+/// cria nova entrada e o histórico cresce. `scores` é um JSON com chaves iguais
+/// às `feedbackDimensions.key` do `Workout` no momento da submissão (snapshot
+/// implícito — chaves removidas continuam visíveis no histórico).
+model WorkoutFeedback {
+  id                String   @id @default(cuid())
+  tenantId          String
+  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workoutId         String
+  workout           Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  studentId         String
+  student           Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  /// `User` que efetivamente submeteu (conta-atleta — pode ser pai/mãe via
+  /// RN-200 quando uma conta-família opera por vários alunos).
+  submittedByUserId String
+  submittedByUser   User     @relation("WorkoutFeedbackAuthor", fields: [submittedByUserId], references: [id], onDelete: Restrict)
+  /// Dia (date, sem hora) — chave do upsert junto com workoutId+studentId.
+  submittedDate     DateTime @db.Date
+  /// JSON `{ <dimensionKey>: 1..5 }`. Aceita parcial (chaves omitidas = sem resposta).
+  scores            Json
+  notes             String?  @db.VarChar(280)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([workoutId, studentId, submittedDate])
+  @@index([tenantId, studentId, submittedDate])
+  @@index([workoutId, submittedDate])
+}
+
+/// Item de um treino: snapshot a partir de `ExerciseLibraryItem` com parâmetros
+/// específicos daquela ocorrência (séries/reps/duração/descanso). `order` é único
+/// dentro do mesmo `workoutId` para preservar a sequência da prescrição.
+model WorkoutExercise {
+  id                  String              @id @default(cuid())
+  workoutId           String
+  workout             Workout             @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  libraryItemId       String
+  libraryItem         ExerciseLibraryItem @relation(fields: [libraryItemId], references: [id], onDelete: Restrict)
+  /// Snapshot do exercício no momento da adição (RN-1310). Mantém a ficha
+  /// estável mesmo que o item da biblioteca seja editado/arquivado depois.
+  nameSnapshot        String              @db.VarChar(140)
+  descriptionSnapshot String?             @db.VarChar(500)
+  videoUrlSnapshot    String?             @db.VarChar(2000)
+  order               Int
+  sets                Int?
+  repetitions         Int?
+  durationSeconds     Int?
+  restSeconds         Int?
+  notes               String?             @db.VarChar(280)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  @@unique([workoutId, order])
+  @@index([workoutId])
+  @@index([libraryItemId])
+}
+
+/// Atribuição de um treino a uma turma OU a um aluno específico (RN-1321).
+/// Modelo simples: uma atribuição por alvo (não há janela de datas).
+/// Constraints adicionais (XOR de turmaId/studentId conforme scope) na migration.
+model WorkoutAssignment {
+  id               String                 @id @default(cuid())
+  tenantId         String
+  tenant           Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workoutId        String
+  workout          Workout                @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  scope            WorkoutAssignmentScope
+  turmaId          String?
+  turma            Turma?                 @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+  studentId        String?
+  student          Student?               @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  assignedByUserId String
+  assignedByUser   User                   @relation("WorkoutAssigner", fields: [assignedByUserId], references: [id], onDelete: Restrict)
+  notes            String?                @db.VarChar(280)
+  createdAt        DateTime               @default(now())
+
+  @@unique([workoutId, turmaId])
+  @@unique([workoutId, studentId])
+  @@index([tenantId])
+  @@index([tenantId, turmaId])
+  @@index([tenantId, studentId])
+  @@index([workoutId])
+}

@@ -7,6 +7,8 @@ O monorepo **personal-futebol-mvp-empty** já inclui:
 - **Backend:** Node.js + **NestJS** + **PostgreSQL** (Prisma).  
 - **Frontend:** **React** + **Vite** (alternativa ao Next.js citado nas regras de negócio originais).
 
+**Decisões já adotadas no código (MVP):** autenticação **JWT** própria (sem Clerk/Firebase neste repo); **Throttler** global na API e limite mais baixo em `POST /auth/login`; mídia servida pela API com autorização (sem bucket objeto gerenciado até evolução de deploy); **Sentry** opcional no frontend via `VITE_SENTRY_DSN`. Detalhes por módulo: [20-estado-implementacao-mvp.md](20-estado-implementacao-mvp.md).
+
 A especificação de negócio é **agnóstica** ao framework front; Next.js pode ser adotado em fork se SSR/SEO forem prioridade para o portal dos pais.
 
 ## 2. Stack sugerida (documento de negócio original)

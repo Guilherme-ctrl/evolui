@@ -11,7 +11,7 @@
 - **Isolamento entre tenants** (RN-021).  
 - **Controle de permissões** por papel ([02-papeis-e-permissoes.md](02-papeis-e-permissoes.md)).  
 - **Proteção de dados pessoais** e sensíveis ([03-multi-tenant-e-lgpd.md](03-multi-tenant-e-lgpd.md)).  
-- Autenticação forte; sessões revogáveis; rate limit em login e upload.
+- Autenticação forte; sessões revogáveis; **rate limit** na API (`@nestjs/throttler`, com limite específico no login) e política de upload a documentar por ambiente.
 
 ## 3. Escalabilidade
 

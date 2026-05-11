@@ -1,5 +1,7 @@
 # 12 — Módulo: Financeiro (simplificado)
 
+> **Refator ATLETA (2026-05):** ver nota no [README de Docs](README.md). A **visão "do responsável"** no app passa a ser a **conta-atleta** (`User role=ATLETA`). O extrato é exposto por `GET /finance/students/:id/extrato`, com o aluno em foco vindo do switcher (header `X-Active-Student-Id`). A **cobrança real** (boleto/Pix/WhatsApp/e-mail) continua endereçada ao `Guardian` com `isPrimaryForBilling=true` — `Guardian` é apenas contato (sem login).
+
 ## 1. Objetivo
 
 Controle **simples** de mensalidades, pagamentos, inadimplência e histórico, com **visão para responsáveis**.

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 36" fill="none" role="img" aria-label="Evolui">
+  <title>Evolui</title>
+  <g transform="translate(0 2)">
+    <path
+      d="M6 6v20M6 6h13M6 15h9M6 26h15"
+      stroke="#0c0e11"
+      stroke-width="2.6"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <path
+      d="M15 15c2-4.5 6.5-6 11-3.5"
+      stroke="#16a34a"
+      stroke-width="2.6"
+      stroke-linecap="round"
+    />
+    <circle cx="26" cy="11.5" r="2" fill="#16a34a" />
+  </g>
+  <text
+    x="36"
+    y="25"
+    fill="#0c0e11"
+    font-family="Inter, system-ui, -apple-system, sans-serif"
+    font-size="19"
+    font-weight="700"
+    letter-spacing="-0.03em"
+  >
+    Evolui
+  </text>
+</svg>

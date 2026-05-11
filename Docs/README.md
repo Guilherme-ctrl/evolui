@@ -2,6 +2,8 @@
 
 Especificações derivadas das regras de negócio do produto (escolinhas de futebol, multi-tenant). Cada arquivo cobre um módulo ou tema transversal, com **rotinas** (fluxos), **regras de negócio** e **critérios de aceite** para implementação e QA.
 
+> **Refator ATLETA (2026-05) — fonte da verdade no código.** O papel `RESPONSAVEL` foi substituído por `ATLETA` no enum `UserRole`. Cada `Student` agora tem `accountUserId` (obrigatório) apontando para um `User role=ATLETA` — a conta que opera o app. `Guardian` virou entidade **de contato** (cobrança/WhatsApp/e-mail), **sem login**. Suporte a múltiplos alunos por conta (switcher no header — RN-200) e aceite de termos no 1º login (RN-201, `User.termsAcceptedAt`+`termsKinship`). Specs `01/02/03/04/10/12/14/18/20` foram atualizadas a partir desta nota; partes que ainda usam o vocabulário antigo devem ser lidas substituindo `RESPONSAVEL → ATLETA` e `Guardian.userId → Student.accountUserId`. Plano antigo de cadastro de responsável com login (em `exec/plano-execucao-mvp.md`) está **superado** por esta refator.
+
 ## Índice
 
 | Arquivo | Conteúdo |
@@ -25,6 +27,20 @@ Especificações derivadas das regras de negócio do produto (escolinhas de fute
 | [16-requisitos-nao-funcionais.md](16-requisitos-nao-funcionais.md) | RNF |
 | [17-arquitetura-e-stack-sugerida.md](17-arquitetura-e-stack-sugerida.md) | Stack e integrações |
 | [18-indice-rotinas-e-aceite.md](18-indice-rotinas-e-aceite.md) | Lista mestre de rotinas e IDs |
+| [19-design-system-brand-guide.md](19-design-system-brand-guide.md) | Identidade, tokens e componentes UI |
+| [20-estado-implementacao-mvp.md](20-estado-implementacao-mvp.md) | Alinhamento specs × código neste repositório |
+| [21-opinioes-melhoria-ux-po.md](21-opinioes-melhoria-ux-po.md) | Diretriz de UX/produto (complementa ROT/CA) |
+| [22-plano-implementacao-doc21.md](22-plano-implementacao-doc21.md) | Plano técnico das melhorias do Doc 21 |
+| [23-design-system-brand-benchmark-mercado.md](23-design-system-brand-benchmark-mercado.md) | Mercado, marca, logo, design system e benchmark (fases + anexos: one-pager e checklist) |
+
+### Execução e engenharia
+
+| Arquivo | Conteúdo |
+|---------|----------|
+| [exec/plano-execucao-mvp.md](exec/plano-execucao-mvp.md) | Fases, ROT/CA e ordem de PRs |
+| [exec/plano-limpeza-padronizacao-codigo.md](exec/plano-limpeza-padronizacao-codigo.md) | Backlog de padronização, lint e refator front |
+| [exec/prompt-sdd-doc22.md](exec/prompt-sdd-doc22.md) | Prompt único para agentes: implementação do Doc 22 |
+| [exec/plano-producao.md](exec/plano-producao.md) | Checklist enxuto: testes, CI, segredos, segurança, operação, deploy |
 
 ## Convenções
 

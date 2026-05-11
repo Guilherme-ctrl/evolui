@@ -1,0 +1,19 @@
+{
+  "name": "personal-futebol-mvp",
+  "private": true,
+  "description": "Monorepo Evolui — SaaS para escolinhas; scripts na raiz para banco, Prisma e dev",
+  "scripts": {
+    "predev": "npx kill-port 3333 || true",
+    "install:all": "npm install --prefix backend && npm install --prefix frontend",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "env": "node scripts/ensure-env.cjs",
+    "prisma:sync": "npm run prisma:generate --prefix backend && npm run prisma:migrate:deploy --prefix backend && npm run db:seed --prefix backend",
+    "bootstrap": "npm run install:all && npm run env && npm run db:up && npm run prisma:sync",
+    "dev": "concurrently -n api,web -c cyan,magenta \"npm run start:dev --prefix backend\" \"npm run dev --prefix frontend\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "kill-port": "^2.0.1"
+  }
+}

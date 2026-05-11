@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none" role="img" aria-label="Evolui">
+  <title>Evolui</title>
+  <!-- Monograma E + arco ascendente (evolucao); tracos arredondados -->
+  <path
+    d="M9 7v18M9 7h12.5M9 15.5h8.5M9 25h14"
+    stroke="#f0f3f7"
+    stroke-width="2.35"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M17.5 15.5C19.5 11 24 9 28 11.5"
+    stroke="#22c55e"
+    stroke-width="2.35"
+    stroke-linecap="round"
+  />
+  <circle cx="28" cy="11.5" r="1.85" fill="#22c55e" />
+</svg>

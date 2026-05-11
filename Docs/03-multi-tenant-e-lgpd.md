@@ -1,5 +1,7 @@
 # 03 — Multi-tenant e LGPD
 
+> **Refator ATLETA (2026-05):** ver nota no [README de Docs](README.md) e [02-papeis-e-permissoes.md](02-papeis-e-permissoes.md). LGPD para menores é tratada via aceite explícito no 1º login (RN-201): `User.termsKinship` ("ATLETA" se o próprio atleta opera, ou parentesco — Pai/Mãe/Tutor — quando um adulto opera a conta) e `User.termsAcceptedAt` registram quem aceitou e quando, mesmo que o app não saiba diferenciar quem está atrás da tela durante o uso. Operacionalmente, a conta opera com escopo `accountUserId`; o login é único por família (RN-200).
+
 ## 1. Multi-tenant (RN-020)
 
 Cada escolinha é um **tenant** com:

@@ -2,9 +2,11 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
+import { RequestLoggingInterceptor } from './common/interceptors/request-logging.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.useGlobalInterceptors(new RequestLoggingInterceptor());
   const config = app.get(ConfigService);
   app.setGlobalPrefix('api');
   app.useGlobalPipes(
@@ -14,16 +16,17 @@ async function bootstrap() {
       transformOptions: { enableImplicitConversion: true },
     }),
   );
-  const raw =
-    config.get<string>('CORS_ORIGIN') ?? 'http://localhost:5173';
-  const origins = raw
+  const defaultOrigins =
+    'http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174';
+  const raw = config.get<string>('CORS_ORIGIN');
+  const source = raw?.trim() ? raw : defaultOrigins;
+  const origins = source
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
-  const fallback = 'http://localhost:5173';
   const origin =
     origins.length === 0
-      ? fallback
+      ? defaultOrigins.split(',').map((s) => s.trim())
       : origins.length === 1
         ? origins[0]
         : origins;

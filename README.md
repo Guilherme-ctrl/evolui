@@ -1,45 +1,37 @@
 # Monorepo vazio (NestJS + Prisma + Vite/React)
 
-Mesma stack do projeto de referência: API NestJS com Prisma e PostgreSQL (Docker), frontend Vite com React 19 e React Router. O código inicia sem domínio de negócio; as **especificações do produto SaaS para escolinhas de futebol** estão em **[Docs/README.md](Docs/README.md)** (regras, rotinas e critérios de aceite).
+Monorepo **Evolui** (SaaS multi-tenant para escolinhas de futebol): API NestJS com Prisma e PostgreSQL (Docker), frontend Vite com React 19 e React Router. As **especificações de produto** estão em **[Docs/README.md](Docs/README.md)** (regras, rotinas e critérios de aceite).
 
 ## Pré-requisitos
 
 - Node.js 20+
 - Docker Desktop ou Docker Engine + Compose
 
-## Uso rápido
+## Uso rápido (um fluxo só na raiz)
 
-1. Banco:
-
-```bash
-docker compose up -d
-```
-
-2. Backend:
+Na pasta do repositório:
 
 ```bash
-cp .env.example backend/.env
-cd backend
-npm install
-npx prisma generate
-npm run start:dev
+npm install          # instala o orquestrador (concurrently, kill-port) na raiz
+npm run bootstrap    # instala backend+frontend, cria backend/.env, sobe Postgres, aplica migrações e seed
+npm run dev          # libera a porta 3333 se estiver presa, sobe API e Vite em paralelo
 ```
 
-Com modelos no `schema.prisma`, use `npx prisma migrate dev` para criar migrações. Sem tabelas, `npx prisma generate` basta para o client.
+Se aparecer `EADDRINUSE` na porta **3333**, feche outro `npm run dev` antigo ou rode `npx kill-port 3333` antes de subir de novo.
 
-A API responde em `http://localhost:3333` (raiz) e `GET http://localhost:3333/api/health`.
+Abra `http://localhost:5173`. A API responde em `http://localhost:3333` e `GET http://localhost:3333/api/health`.
 
-O Postgres do Docker usa a porta **5433** no host (para não colidir com outro Postgres na 5432). Ajuste `DATABASE_URL` se mudar o mapeamento em `docker-compose.yml`.
+**Comandos úteis**
 
-3. Frontend:
+| Comando | O que faz |
+|--------|-----------|
+| `npm run db:up` / `npm run db:down` | Sobe ou derruba só o Postgres (Docker) |
+| `npm run prisma:sync` | `generate` + `migrate deploy` + seed (com banco já no ar) |
+| `npm run install:all` | Só `npm install` em `backend/` e `frontend/` |
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
+O Postgres do Docker usa a porta **5433** no host. Ajuste `DATABASE_URL` em `backend/.env` se mudar o `docker-compose.yml`.
 
-Abra `http://localhost:5173`. Em desenvolvimento, `/api` é encaminhado para o backend.
+**Alterar o schema Prisma:** use `cd backend && npx prisma migrate dev` para gerar uma nova migração (o `bootstrap` / `prisma:sync` só **aplica** migrações existentes com `migrate deploy`).
 
 ## Testes (backend)
 
@@ -50,6 +42,10 @@ cd backend
 npm test
 npm run test:e2e
 ```
+
+## Backup e recuperação (CA-16.02)
+
+Em produção, definir **RPO/RTO** com o time de operações (ex.: backup diário do Postgres gerenciado, retenção 7–30 dias, teste de restore trimestral). O detalhamento fica fora do código; este repositório assume Postgres com `DATABASE_URL` configurável.
 
 ## Licença
 
