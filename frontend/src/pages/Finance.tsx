@@ -3,7 +3,7 @@ import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { Banner } from '../components/Banner';
 import { useToast } from '../components/useToast';
-import { apiFetch, errorMessageFromUnknown, getToken } from '../lib/api';
+import { apiFetch, apiUrl, errorMessageFromUnknown, getToken } from '../lib/api';
 import { runDeferredEffect } from '../lib/run-deferred';
 import { formatDateBR, formatDateTimeBR } from '../lib/format-date';
 
@@ -301,7 +301,7 @@ export default function Finance() {
     setErr(null);
     try {
       const token = getToken();
-      const res = await fetch('/api/finance/delinquency/export.csv', {
+      const res = await fetch(apiUrl('/finance/delinquency/export.csv'), {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!res.ok) throw new Error('Falha ao exportar CSV');

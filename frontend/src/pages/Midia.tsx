@@ -6,7 +6,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { Modal } from '../components/Modal';
 import { ProgressBar } from '../components/ProgressBar';
 import { useToast } from '../components/useToast';
-import { apiFetch, apiFetchBlob, getToken, setToken } from '../lib/api';
+import { apiFetch, apiFetchBlob, apiUrl, getToken, setToken } from '../lib/api';
 import { runDeferredEffect } from '../lib/run-deferred';
 import { formatDateBR } from '../lib/format-date';
 
@@ -39,7 +39,7 @@ function postUploadMulti(
     if (q.eventId) params.set('eventId', q.eventId);
     if (q.studentIds?.length) params.set('studentIds', q.studentIds.join(','));
     const qs = params.toString();
-    xhr.open('POST', `/api/media/upload-multi${qs ? `?${qs}` : ''}`);
+    xhr.open('POST', `${apiUrl('/media/upload-multi')}${qs ? `?${qs}` : ''}`);
     const t = getToken();
     if (t) xhr.setRequestHeader('Authorization', `Bearer ${t}`);
     xhr.upload.onprogress = (e) => {

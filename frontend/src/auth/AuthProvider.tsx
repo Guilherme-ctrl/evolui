@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   apiFetch,
+  apiUrl,
   formatApiErrorBody,
   getActiveStudentId,
   getToken,
@@ -78,7 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (tenantSlug: string, email: string, password: string) => {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(apiUrl('/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tenantSlug, email, password }),
@@ -96,6 +97,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         if (res.status === 401 || res.status === 403) {
           throw new Error('Credenciais inválidas ou escolinha incorreta.');
+        }
+        if (res.status === 405) {
+          throw new Error(
+            'A requisição não chegou na API (HTTP 405). Em produção, defina VITE_API_URL na Vercel com a URL pública do backend (Render) e faça um novo deploy.',
+          );
         }
         if (res.status >= 500 || res.status === 502 || res.status === 503) {
           throw new Error(

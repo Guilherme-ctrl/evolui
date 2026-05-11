@@ -1,6 +1,22 @@
 const TOKEN_KEY = 'evolui_token';
 const ACTIVE_STUDENT_KEY_PREFIX = 'evolui_active_student:';
 
+/**
+ * URL absoluta ou relativa para uma rota sob o prefixo global `/api` do Nest.
+ * Em produção, defina `VITE_API_URL` (ex.: `https://seu-servico.onrender.com`) na Vercel.
+ * Em dev, omita — o Vite encaminha `/api` para o backend local.
+ *
+ * @param path rota após `/api`, começando com `/` (ex.: `/auth/login`).
+ */
+export function apiUrl(path: string): string {
+  const raw = import.meta.env.VITE_API_URL;
+  const base =
+    typeof raw === 'string' && raw.trim() ? raw.trim().replace(/\/+$/, '') : '';
+  const route = path.startsWith('/') ? path : `/${path}`;
+  const fullPath = `/api${route}`;
+  return base ? `${base}${fullPath}` : fullPath;
+}
+
 /** Erro HTTP da API com mensagem já legível (NestJS / class-validator). */
 export class ApiRequestError extends Error {
   readonly status: number;
@@ -130,7 +146,7 @@ export async function apiFetch<T>(
   attachActiveStudentHeader(headers);
 
   const hadAuth = !!token;
-  const res = await fetch(`/api${path}`, { ...init, headers });
+  const res = await fetch(apiUrl(path), { ...init, headers });
   if (res.status === 401) {
     if (hadAuth) {
       setToken(null);
@@ -159,7 +175,7 @@ export async function apiFetchBlob(
   if (token) headers.set('Authorization', `Bearer ${token}`);
   attachActiveStudentHeader(headers);
   const hadAuth = !!token;
-  const res = await fetch(`/api${path}`, { ...init, headers });
+  const res = await fetch(apiUrl(path), { ...init, headers });
   if (res.status === 401) {
     if (hadAuth) {
       setToken(null);
