@@ -24,6 +24,15 @@ function capFirst(s: string): string {
   return s.charAt(0).toLocaleUpperCase('pt-BR') + s.slice(1);
 }
 
+/** Exibição pt-BR: `6 de mai.` (dia + mês curto). */
+export function formatDayShortBR(value: string | Date | null | undefined): string {
+  const d = asDate(value);
+  if (!d) return '—';
+  return d
+    .toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' })
+    .replace('.', '');
+}
+
 /** Exibição pt-BR: `dd/MM/yyyy`. */
 export function formatDateBR(value: string | Date | null | undefined): string {
   const d = asDate(value);

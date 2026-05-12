@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { Banner } from '../components/Banner';
 import { useToast } from '../components/useToast';
@@ -182,10 +182,17 @@ function escapeHtml(s: string) {
 
 type Tab = 'inadimplencia' | 'cobrancas' | 'historico';
 
+const TAB_PATHS: Tab[] = ['inadimplencia', 'cobrancas', 'historico'];
+
 export default function Finance() {
   const toast = useToast();
   const { user } = useAuth();
-  const [tab, setTab] = useState<Tab>('inadimplencia');
+  const { tab: tabParam } = useParams<{ tab: string }>();
+  const navigate = useNavigate();
+  const tabValid =
+    tabParam != null &&
+    TAB_PATHS.includes(tabParam as Tab);
+  const tab: Tab = tabValid ? (tabParam as Tab) : 'inadimplencia';
   const [delRows, setDelRows] = useState<DelRow[]>([]);
   const [students, setStudents] = useState<St[]>([]);
   const [histStudent, setHistStudent] = useState('');
@@ -284,7 +291,7 @@ export default function Finance() {
   }, [user?.role, tab, histStudent, reportFinanceErr]);
 
   const selectTab = (t: Tab) => {
-    setTab(t);
+    navigate(`/financeiro/${t}`);
     setErr(null);
     setSelectedDelIds([]);
     setSelectedHistIds([]);
@@ -293,6 +300,10 @@ export default function Finance() {
   };
 
   if (user?.role !== 'ADMIN') return <Navigate to="/" replace />;
+
+  if (!tabValid) {
+    return <Navigate to="/financeiro/inadimplencia" replace />;
+  }
 
   const studentName = (id: string) =>
     students.find((s) => s.id === id)?.fullName ?? '—';
@@ -634,76 +645,86 @@ export default function Finance() {
               competências cadastradas.
             </p>
           ) : (
-            <ul className="plain card card--lg stack" style={{ gap: 'var(--space-4)' }}>
-              {delRows.map((r) => (
-                <li
-                  key={r.id}
-                  className="stack card"
-                  style={{
-                    padding: 'var(--space-4)',
-                    background: 'var(--bg-muted)',
-                    borderRadius: 'var(--radius-card)',
-                  }}
-                >
-                  <div
-                    className="row finance-del-row"
-                    style={{
-                      alignItems: 'flex-start',
-                      gap: 'var(--space-3)',
-                      width: '100%',
-                      flexWrap: 'nowrap',
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      className="finance-del-row__cb"
-                      checked={selectedDelIds.includes(r.id)}
-                      onChange={() => toggleDelSelected(r.id)}
-                      aria-label={`Selecionar cobrança: ${r.student?.fullName ?? 'aluno'}`}
-                    />
-                    <div className="stack" style={{ flex: '1 1 auto', minWidth: 0, gap: 'var(--space-3)' }}>
-                      <div
-                        className="row"
-                        style={{
-                          justifyContent: 'space-between',
-                          width: '100%',
-                          flexWrap: 'wrap',
-                          gap: 'var(--space-3)',
-                        }}
-                      >
-                        <div>
-                          <strong>{r.student?.fullName ?? 'Aluno'}</strong>
-                          <p className="text-caption muted" style={{ margin: 0 }}>
-                            {r.student?.id ? (
-                              <Link to={`/alunos/${r.student.id}`}>Ficha do aluno</Link>
-                            ) : null}
-                          </p>
+            <div className="card card--lg" style={{ padding: 0, overflow: 'hidden' }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '2.5rem' }}>
+                      <input
+                        type="checkbox"
+                        aria-label="Selecionar todas"
+                        checked={selectedDelIds.length === delRows.length && delRows.length > 0}
+                        onChange={() =>
+                          selectedDelIds.length === delRows.length ? clearDelSelection() : selectAllDel()
+                        }
+                      />
+                    </th>
+                    <th>Aluno</th>
+                    <th>Valor</th>
+                    <th>Vencimento</th>
+                    <th>Status</th>
+                    <th style={{ width: '12rem' }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {delRows.map((r) => (
+                    <tr key={r.id} className={selectedDelIds.includes(r.id) ? 'data-table__row--selected' : ''}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedDelIds.includes(r.id)}
+                          onChange={() => toggleDelSelected(r.id)}
+                          aria-label={`Selecionar ${r.student?.fullName ?? 'aluno'}`}
+                        />
+                      </td>
+                      <td>
+                        <div className="stack" style={{ gap: '2px' }}>
+                          <strong style={{ fontSize: 'var(--text-sm)' }}>
+                            {r.student?.fullName ?? 'Aluno'}
+                          </strong>
+                          {r.student?.id ? (
+                            <Link
+                              to={`/alunos/${r.student.id}`}
+                              className="text-caption"
+                              style={{ color: 'var(--text-secondary)' }}
+                            >
+                              Ver ficha
+                            </Link>
+                          ) : null}
                         </div>
+                      </td>
+                      <td className="tabular-nums" style={{ fontSize: 'var(--text-sm)' }}>
+                        R$ {(r.amountCents / 100).toFixed(2)}
+                      </td>
+                      <td className="tabular-nums text-caption">
+                        {formatDateBR(r.dueDate)}
+                      </td>
+                      <td>
                         <span className={chargeBadgeClass(r.status)}>{r.status}</span>
-                      </div>
-                      <p className="text-body tabular-nums" style={{ margin: 0 }}>
-                        R$ {(r.amountCents / 100).toFixed(2)} · venc. {formatDateBR(r.dueDate)}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={() => {
-                      setPayTarget({
-                        id: r.id,
-                        studentName: r.student?.fullName ?? 'Aluno',
-                        amountCents: r.amountCents,
-                        dueDate: r.dueDate,
-                      });
-                      setPayOpen(true);
-                    }}
-                  >
-                    Registrar pagamento
-                  </button>
-                </li>
-              ))}
-            </ul>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          style={{ fontSize: 'var(--text-xs)', padding: '0.3rem 0.75rem' }}
+                          onClick={() => {
+                            setPayTarget({
+                              id: r.id,
+                              studentName: r.student?.fullName ?? 'Aluno',
+                              amountCents: r.amountCents,
+                              dueDate: r.dueDate,
+                            });
+                            setPayOpen(true);
+                          }}
+                        >
+                          Registrar pagamento
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </>
       ) : null}

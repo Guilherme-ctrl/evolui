@@ -115,6 +115,25 @@ export class DashboardService {
     const endOfToday = new Date(startOfToday);
     endOfToday.setDate(endOfToday.getDate() + 1);
 
+    const startOfTomorrow = endOfToday;
+    const endOfTomorrow = new Date(startOfTomorrow);
+    endOfTomorrow.setDate(endOfTomorrow.getDate() + 1);
+
+    const calendarHomeInclude = {
+      turmas: {
+        include: {
+          turma: {
+            select: {
+              id: true,
+              name: true,
+              coach: { select: { fullName: true } },
+            },
+          },
+        },
+      },
+      createdBy: { select: { fullName: true } },
+    } as const;
+
     // Semana ISO (segunda → domingo).
     const dow = (now.getDay() + 6) % 7;
     const weekStart = new Date(now);
@@ -142,6 +161,7 @@ export class DashboardService {
       staffCount,
       delinqCharges,
       todayEventsRaw,
+      tomorrowEventsRaw,
       weekEventsRaw,
       distinctEvalRows,
       totalEvalThisMonth,
@@ -176,9 +196,16 @@ export class DashboardService {
           status: { not: 'CANCELLED' },
         },
         orderBy: { startsAt: 'asc' },
-        include: {
-          turmas: { include: { turma: { select: { id: true, name: true } } } },
+        include: calendarHomeInclude,
+      }),
+      this.prisma.calendarEvent.findMany({
+        where: {
+          tenantId,
+          startsAt: { gte: startOfTomorrow, lt: endOfTomorrow },
+          status: { not: 'CANCELLED' },
         },
+        orderBy: { startsAt: 'asc' },
+        include: calendarHomeInclude,
       }),
       this.prisma.calendarEvent.findMany({
         where: {
@@ -255,19 +282,55 @@ export class DashboardService {
     for (const e of todayEventsRaw) {
       byType[e.type] = (byType[e.type] ?? 0) + 1;
     }
-    const todayItems = todayEventsRaw.map((e) => ({
-      id: e.id,
-      title: e.title,
-      type: e.type,
-      startsAt: e.startsAt.toISOString(),
-      endsAt: e.endsAt.toISOString(),
-      status: e.status,
-      isWholeSchool: e.isWholeSchool,
-      turmas: e.turmas.map((t) => ({
-        turmaId: t.turmaId,
-        turma: { id: t.turma.id, name: t.turma.name },
-      })),
-    }));
+    const mapHomeEvent = (
+      e: (typeof todayEventsRaw)[number],
+    ): {
+      id: string;
+      title: string;
+      type: string;
+      startsAt: string;
+      endsAt: string;
+      status: string;
+      isWholeSchool: boolean;
+      location: string | null;
+      coachSubtitle: string | null;
+      turmas: Array<{
+        turmaId: string;
+        turma: { id: string; name: string };
+      }>;
+    } => {
+      const coachNames = e.isWholeSchool
+        ? e.createdBy?.fullName
+          ? [e.createdBy.fullName]
+          : []
+        : [
+            ...new Set(
+              e.turmas
+                .map((t) => t.turma.coach?.fullName)
+                .filter((n): n is string => !!n && n.length > 0),
+            ),
+          ];
+      const coachSubtitle =
+        coachNames.length > 0 ? coachNames.join(' · ') : null;
+      return {
+        id: e.id,
+        title: e.title,
+        type: e.type,
+        startsAt: e.startsAt.toISOString(),
+        endsAt: e.endsAt.toISOString(),
+        status: e.status,
+        isWholeSchool: e.isWholeSchool,
+        location: e.location,
+        coachSubtitle,
+        turmas: e.turmas.map((t) => ({
+          turmaId: t.turmaId,
+          turma: { id: t.turma.id, name: t.turma.name },
+        })),
+      };
+    };
+
+    const todayItems = todayEventsRaw.map(mapHomeEvent);
+    const tomorrowItems = tomorrowEventsRaw.map(mapHomeEvent);
 
     // --- KPI Feedback físico (semana até agora) --------------------------
     const tenantDefaultDims: FeedbackDimension[] = parseFeedbackDimensions(
@@ -322,6 +385,10 @@ export class DashboardService {
         total: todayEventsRaw.length,
         byType,
         items: todayItems,
+      },
+      tomorrowEvents: {
+        total: tomorrowEventsRaw.length,
+        items: tomorrowItems,
       },
       physicalFeedbackWeek,
       evaluations,

@@ -1,4 +1,4 @@
-import { Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthProvider';
 import { ToastProvider } from './components/ToastProvider';
 import AppLayout from './layout/AppLayout';
@@ -63,7 +63,11 @@ export default function App() {
           <Route path="/turmas" element={<Turmas />} />
           <Route path="/calendario" element={<Calendar />} />
           <Route path="/presenca" element={<Attendance />} />
-          <Route path="/financeiro" element={<Finance />} />
+          <Route
+            path="/financeiro"
+            element={<Navigate to="/financeiro/inadimplencia" replace />}
+          />
+          <Route path="/financeiro/:tab" element={<Finance />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/filhos/:studentId/relatorios" element={<FilhoRelatorios />} />
           <Route path="/filhos/:studentId/planos/:planId" element={<FilhoPlanoDetail />} />
